@@ -21,7 +21,7 @@
 
         this._textureAtlas = null;
 
-        this._vesselTypeTexCoords = {};
+        this._vesselTypeImage = {};
     };
 
     AISTileRender.prototype = {
@@ -34,44 +34,47 @@
             this._textureAtlas = new og.TextureAtlas(512, 512);
             this._textureAtlas.assignHandler(this._handler);
 
+            var ta = this._textureAtlas;
+
             var _this = this;
 
             for (var i = 0; i < styles.length; i++) {
 
                 var si = styles[i];
 
-                var f = si.Filter,
-                    t;
-                if (!f) {
-                    t = "unknown";
-                } else {
-                    t = f.split('=')[1].trim();
-                    t = t.substr(1, t.length - 2);
-                }
+                (function (style) {
 
-                var src = si.RenderStyle.iconUrl;
+                    var f = style.Filter,
+                        t;
+                    if (!f) {
+                        t = "unknown";
+                    } else {
+                        t = f.split('=')[1].trim();
+                        t = t.substr(1, t.length - 2);
+                    }
 
-                (function (src, t) {
-
-                    var canvas = document.createElement('canvas');
-                    canvas.width = W;
-                    canvas.height = H;
+                    var src = style.RenderStyle.iconUrl;
 
                     var img = new Image();
                     img.crossOrigin = '';
 
                     img.onload = function () {
 
+                        var canvas = document.createElement('canvas');
+                        canvas.width = W;
+                        canvas.height = H;
                         canvas.getContext("2d").drawImage(img, 0, 0, W, H);
 
-                        _this._textureAtlas.loadImage(canvas.toDataURL(), function (img, texCoords) {
-                            _this._vesselTypeTexCoords[t] = texCoords;
+                        ta.loadImage(canvas.toDataURL(), function (img) {
+                            _this._vesselTypeImage[t] = img;
+                            ta.addImage(img);
+                            ta.createTexture();
                         });
                     };
 
                     img.src = src;
 
-                })(src, t);
+                })(si);
 
             }
         },
@@ -175,8 +178,10 @@
                 LL = 34,
                 ROT = 19;
 
-            var vtc = this._vesselTypeTexCoords;
+            var vti = this._vesselTypeImage;
+            var ta = this._textureAtlas;
 
+            // console.time("_createBuffers");
 
             for (var i = 0; i < length; i++) {
 
@@ -185,7 +190,7 @@
                     lat = prop[LL].coordinates[1],
                     rot = prop[ROT];
 
-                var tc = vtc[prop[VT]] || vtc.unknown;
+                var tc = ta.getImageTexCoordinates(vti[prop[VT]] || vti.unknown);
 
                 var i24 = i * 24,
                     i18 = i * 18;
@@ -263,6 +268,7 @@
             this._a_vert_tex_buffer = h.createArrayBuffer(v, 4, v.length / 4, gl.DYNAMIC_DRAW);
             this._a_size_offset_buffer = h.createArrayBuffer(s, 4, s.length / 4, gl.DYNAMIC_DRAW);
             this._a_lonlat_rotation_buffer = h.createArrayBuffer(c, 3, c.length / 3, gl.DYNAMIC_DRAW);
+            // console.timeEnd("_createBuffers");
         },
 
         render: function (outData, tileData) {
@@ -334,34 +340,20 @@
                 tileRender.initialize();
 
                 aisIDs.split(',').map(function (id) {
-
                     var gmxLayer = nsGmx.gmxMap.layersByID[id.trim()];
-
                     if (gmxLayer) {
-
                         tileRender.createTextureAtlas(gmxLayer.getStyles());
-
-                        var _dataCache = {};
-
-                        gmxLayer.addPreRenderHook(function (tile, info) {
-                            info.skipDraw = true;
-                            var id = info.x + ':' + info.y + ':' + info.z;
-                            if (tile) {
-                                var _data = new Uint8Array(256 * 256 * 4);
+                        gmxLayer._webGLRenderer = function (info) {
+                            var tile = info.tile,
+                                context = info.ctx;
+                            if (context) {
+                                var _data = new Uint8Array(4 * tile.width * tile.height);
                                 tileRender.render(_data, info);
-                                _dataCache[id] = _data;
-                            }
-                        });
-
-                        gmxLayer.addRenderHook(function (tile, info) {
-                            var id = info.x + ':' + info.y + ':' + info.z;
-                            if (_dataCache[id]) {
-                                var context = tile.getContext('2d');
                                 var imageData = context.createImageData(tile.width, tile.height);
-                                imageData.data.set(_dataCache[id]);
+                                imageData.data.set(_data);
                                 context.putImageData(imageData, 0, 0);
                             }
-                        });
+                        };
                     }
                 });
             });
