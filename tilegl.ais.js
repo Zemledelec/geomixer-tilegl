@@ -343,11 +343,13 @@
                     var gmxLayer = nsGmx.gmxMap.layersByID[id.trim()];
                     if (gmxLayer) {
                         tileRender.createTextureAtlas(gmxLayer.getStyles());
+
+                        var _data = new Uint8Array(4 * 256 * 256);
+
                         gmxLayer._webGLRenderer = function (info) {
                             var tile = info.tile,
                                 context = info.ctx;
                             if (context) {
-                                var _data = new Uint8Array(4 * tile.width * tile.height);
                                 tileRender.render(_data, info);
                                 var imageData = context.createImageData(tile.width, tile.height);
                                 imageData.data.set(_data);
