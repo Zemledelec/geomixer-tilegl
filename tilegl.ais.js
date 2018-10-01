@@ -28,9 +28,6 @@
 
         createTextureAtlas: function (styles) {
 
-            var W = 16,
-                H = 16;
-
             this._textureAtlas = new og.TextureAtlas(512, 512);
             this._textureAtlas.assignHandler(this._handler);
 
@@ -61,9 +58,9 @@
                     img.onload = function () {
 
                         var canvas = document.createElement('canvas');
-                        canvas.width = W;
-                        canvas.height = H;
-                        canvas.getContext("2d").drawImage(img, 0, 0, W, H);
+                        canvas.width = this.width;
+                        canvas.height = this.height;
+                        canvas.getContext("2d").drawImage(img, 0, 0, this.width, this.height);
 
                         ta.loadImage(canvas.toDataURL(), function (img) {
                             _this._vesselTypeImage[t] = img;
@@ -86,7 +83,7 @@
                 height: this._height,
                 context: {
                     alpha: true,
-                    depth: false
+                    depth: true
                 }
             });
             this._handler.initialize();
@@ -144,9 +141,9 @@
                 \n\
                 void main () {\n\
                     vec4 color = texture2D(u_texture, uv);\n\
-                    if(color.a < 0.1)\n\
-                        discard;\n\
-                    gl_FragColor = color;/*vec4(color, 1.0);*/\n\
+                    /*if(color.a < 0.2)\n\
+                        discard*/;\n\
+                    gl_FragColor = color;\n\
                 }'
             }));
         },
@@ -171,8 +168,7 @@
                 c = this._a_lonlat_rotation_bufferArr,
                 s = this._a_size_offset_bufferArr;
 
-            var _w = 10.0, _h = 20.0,
-                dx = 0.0, dy = 0.0;
+            var dx = 0.0, dy = 0.0;
 
             var VT = 5,
                 LL = 34,
@@ -190,7 +186,12 @@
                     lat = prop[LL].coordinates[1],
                     rot = prop[ROT];
 
-                var tc = ta.getImageTexCoordinates(vti[prop[VT]] || vti.unknown);
+                var img = vti[prop[VT]] || vti.unknown;
+
+                var _w = img.width,
+                    _h = img.height;
+
+                var tc = ta.getImageTexCoordinates(img);
 
                 var i24 = i * 24,
                     i18 = i * 18;
@@ -285,8 +286,13 @@
 
             this._framebuffer.activate();
 
+            gl.disable(gl.DEPTH_TEST);
             gl.disable(gl.CULL_FACE);
+
             gl.enable(gl.BLEND);
+            gl.blendEquation(gl.FUNC_ADD);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
 
             gl.clearColor(0.0, 0.0, 0.0, 0.0);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
